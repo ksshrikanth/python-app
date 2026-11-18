@@ -9,6 +9,8 @@ on:
 
 jobs:
   ci:
+    outputs:
+      commit_id: ${{ env.COMMIT_ID }}
     runs-on: ubuntu-latest
     steps:
       - name: Declare some variables
@@ -31,6 +33,28 @@ jobs:
     needs: ci
     runs-on: self-hosted
     steps:
+      - uses: actions/checkout@v2
+      - name: Modify values file
+        shell: bash
+        run: |    
+          echo ${{needs.ci.outputs.commit_id}}
+          mkdir -p "$HOME/.local/bin"
+
+          python3 -c "import urllib.request,os; urllib.request.urlretrieve('https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64', os.path.expanduser('~/.local/bin/yq'))"
+          chmod +x "$HOME/.local/bin/yq"
+          export PATH="$HOME/.local/bin:$PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+
+          COMMIT_ID="${{ needs.ci.outputs.commit_id }}"
+          echo "Updating image tag to: $COMMIT_ID"
+          yq -i '.image.tag = "${{ needs.ci.outputs.commit_id }}"' charts/python-app/values.yaml
+          echo "Updated values.yaml:"
+
+      - name: Commit changes
+        uses: EndBug/add-and-commit@v9
+        with:
+          message: 'updates values.yaml with commit ${{ needs.ci.outputs.commit_id }}'
+
       - name: Install argocd
         shell: bash
         run: |
